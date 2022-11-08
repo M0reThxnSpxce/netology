@@ -8,12 +8,13 @@ def create_db(conn):
             last_name VARCHAR(60),
             email VARCHAR(60)
             );""")
-    with conn.cursor() as cur:
+
         cur.execute("""CREATE TABLE IF NOT EXISTS phones(
             id SERIAL PRIMARY KEY,
             client_id INTEGER REFERENCES customers(client_id),
             phone VARCHAR(12)
             );""")
+        conn.commit()
 
 def add_client(conn, first_name, last_name, email, phones=None):
     with conn.cursor() as cur:
@@ -34,14 +35,25 @@ def add_phone(conn, client_id, phone):
 
 def change_client(conn, client_id, first_name=None, last_name=None, email=None, phones=None):
     with conn.cursor() as cur:
-        cur.execute("""
-        UPDATE customers SET first_name=%s, last_name=%s, email=%s  WHERE client_id=%s;
-        """, (first_name, last_name, email, client_id))
+        if not (first_name is None):
+            cur.execute("""
+            UPDATE customers SET first_name=%s WHERE client_id=%s;
+            """, (first_name, client_id))
+
+        if not (last_name is None):
+            cur.execute("""
+            UPDATE customers SET last_name=%s WHERE client_id=%s;
+            """, (last_name, client_id))
+
+        if not (email is None):
+            cur.execute("""
+            UPDATE customers SET email=%s  WHERE client_id=%s;
+            """, (email, client_id))
+
         if not (phones is None):
-            with conn.cursor() as cur:
-                cur.execute("""
-                UPDATE phones SET phone=%s WHERE client_id=%s;
-                """, (phones, client_id))
+            cur.execute("""
+            UPDATE phones SET phone=%s WHERE client_id=%s;
+            """, (phones, client_id))
 
 def delete_phone(conn, client_id, phones=None):
     if not (phones is None):
@@ -51,11 +63,14 @@ def delete_phone(conn, client_id, phones=None):
             """, (client_id))
     else:
         print("Ошибка: У клиента номер телефона отсутствует.")
-def delete_client(conn, client_id):
-    pass
-
-def find_client(conn, first_name=None, last_name=None, email=None, phone=None):
-    pass
+def delete_client(conn, client_id, client=None):
+    if not (client is None):
+        with conn.cursor() as cur:
+            cur.execute("""
+            DELETE FROM customers WHERE client_id =%s;
+            """, (client_id))
+    else:
+        print("Ошибка: Такого клиента нет в базе данных.")    
 
 
 with psycopg2.connect(database="clients", user="postgres", password="root") as conn:
@@ -65,6 +80,7 @@ with psycopg2.connect(database="clients", user="postgres", password="root") as c
     print("3. Добавить телефон для существующего клиента")
     print("4. Изменить данные о клиенте")
     print("5. Удалить телефон для существующего клиента")
+    print("6. Удалить существующего клиента")
     number_menu = int(input(' '))
     if number_menu == 1:
         create_db(conn)
@@ -88,10 +104,19 @@ with psycopg2.connect(database="clients", user="postgres", password="root") as c
         change_client(conn, client_id, first_name, last_name, email, phones)
     elif number_menu == 5:
         client_id = int(input('Введите номер клиента: '))
+        phone = str(input('Телефон клиента: '))
         with conn.cursor() as cur:
-            cur.execute("""SELECT phone FROM phones WHERE client_id=%s
-            """, (client_id))
+            cur.execute("""SELECT phone FROM phones WHERE client_id=%s AND phone=%s
+            """, (client_id, phone))
             phones = cur.fetchone()
         delete_phone(conn, client_id, phones)
+    elif number_menu == 6:
+        client_id = input('Введите id клиента которого хотите удалить: ')
+        last_name = str(input('Введите фамилию клиента которого хотите удалить: '))
+        with conn.cursor() as cur:
+            cur.execute("""SELECT client_id, last_name FROM customers WHERE client_id=%s AND phone=%s
+            """, (client_id, last_name))
+            client = cur.fetchone()
+        delete_client(conn, client_id, client)
 
 conn.close()
